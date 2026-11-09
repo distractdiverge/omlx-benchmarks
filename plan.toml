@@ -1,0 +1,33 @@
+# What to benchmark. `omlx-bench plan` expands this into queue.csv,
+# one row per (model, single test). Re-running `plan` only ADDS new rows;
+# it never touches rows that already ran.
+
+models = [
+  # "Qwen3-30B-A3B-4bit",
+]
+
+# Named settings variants. Each step runs once per variant listed in `use`.
+# Keys are oMLX per-model setting names. Settings are snapshotted before and restored after each step.
+[variants]
+use = ["baseline"]
+baseline = {}
+# tq4 = { turboquant_kv_enabled = true, turboquant_kv_bits = 4 }
+
+[performance]          # one step = one prompt length, or one batch size
+prompt_lengths = [1024, 4096, 8192]
+batch_sizes = [2, 4, 8]  # each batch step also re-runs a pp1024 single (oMLX requires one)
+generation_length = 128
+context_profile = "code_python"
+
+[intelligence]         # one step = one suite
+sample_size = 200      # 0 = full dataset
+suites = ["mmlu", "gsm8k", "humaneval"]
+enable_thinking = false
+sampling_profile = "deterministic"
+
+[context]              # one step = one target size
+keep_context_result = false  # true = keep the max_context_window it discovers
+target_tokens = [32768, 131072]
+
+[run]
+max_attempts = 3       # auto-retries per step before it stays `fail`

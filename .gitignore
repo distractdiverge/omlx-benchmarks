@@ -1,0 +1,12 @@
+# secrets
+.env
+# python / uv
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+# macOS
+.DS_Store
+# runtime
+*.lock.tmp
