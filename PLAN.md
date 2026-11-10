@@ -1,6 +1,6 @@
 # omlx-bench — plan (v2)
 
-Status: **approved 2026-11-09; in development.**
+Status: **built 2026-11-09 (58 tests passing against a fake oMLX); next: smoke test on the Mac.** Design rationale lives in `docs/adr/`.
 API facts verified against oMLX source, commit 2165e75 (Nov 5 2026).
 
 ## Goal
@@ -76,12 +76,14 @@ Performance and intelligence results are automatically uploaded to the omlx.ai c
 5. **Model by model:** finish every step for one model before starting the next.
 6. Each intelligence step also writes `results/exports/<model_id>_<benchmark>.json` in exactly the format of oMLX's own Download JSON, so the dashboard skill ingests it unchanged. The run date comes from `results/index.csv`.
 
-## Build order (after approval)
-1. `client.py` + `ledger.py` + `queue.py`, tested here against a fake oMLX server that replays the real event sequences, including failures, 409s, cancel and resume.
-2. `steps.py` + `plan` / `status` / `retry` commands.
-3. `settings.py` (snapshot/apply/restore + `settings` commands), then `run` + `keepawake.py`.
-4. Smoke test on your Mac: one small model, one perf step (pp1024), one intelligence step (gsm8k with 20 samples), one context step (16k).
-5. Check that the result files feed the Local LLM Benchmarks dashboard skill, and adjust the index columns if needed.
+## Build order
+- [x] Config, API client (SSE), queue.csv, ledger + dashboard exports
+- [x] Plan expansion with up-front validation; settings snapshot/apply/restore
+- [x] Runner (ADR 0006 failure rules), keep-awake, CLI
+- [x] End-to-end test of the shipped defaults against a fake server
+- [ ] `uv sync` on the Mac, commit `uv.lock`
+- [ ] Smoke test: one small model, `run --limit` through one step of each suite
+- [ ] Feed a real export through the dashboard skill
 
 ## Out of scope for now
 ANE tuning, external (remote) endpoints, git commits (you commit).
