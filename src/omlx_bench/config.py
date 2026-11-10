@@ -80,7 +80,9 @@ def load(start: Path | None = None, environ: dict[str, str] | None = None) -> Co
     env = dict(environ if environ is not None else os.environ)
     dotenv_path = root / ".env"
     fileenv = parse_dotenv(dotenv_path.read_text()) if dotenv_path.is_file() else {}
-    get = lambda k, d="": env.get(k) or fileenv.get(k) or d  # noqa: E731
+    def get(k: str, d: str = "") -> str:
+        return env.get(k) or fileenv.get(k) or d
+
     key = get("OMLX_API_KEY")
     if not key:
         raise ConfigError("OMLX_API_KEY is empty. Put the MAIN oMLX API key in .env (sub-keys can't use admin routes).")
