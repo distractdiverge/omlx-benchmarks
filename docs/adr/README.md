@@ -9,3 +9,4 @@ Format (Michael Nygard): **Status · Context · Decision · Consequences.**
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
 | [0002](0002-one-test-per-step.md) | One test per step, model by model | Accepted |
+| [0003](0003-always-restore-settings.md) | Benchmarks never leave a settings change behind | Accepted |
