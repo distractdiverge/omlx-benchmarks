@@ -58,6 +58,51 @@ def _subset(name: str, values, allowed: set) -> list:
     return values
 
 
+def _performance_templates(perf: dict) -> list[tuple[str, str, dict]]:
+    """Expand [performance] into (suite, label, params) templates."""
+    tg = perf.get("generation_length", 128)
+    _check(isinstance(tg, int) and tg > 0, "performance.generation_length must be a positive integer")
+    prof = perf.get("context_profile", "code_python")
+    _check(prof in CONTEXT_PROFILES, f"performance.context_profile must be one of {sorted(CONTEXT_PROFILES)}")
+    warm = perf.get("warmup_mode", "quick")
+    _check(warm in WARMUP_MODES, f"performance.warmup_mode must be one of {sorted(WARMUP_MODES)}")
+    common = {"generation_length": tg, "context_profile": prof, "warmup_mode": warm}
+    out: list[tuple[str, str, dict]] = []
+    for pp in _subset("performance.prompt_lengths", perf.get("prompt_lengths", []), PROMPT_LENGTHS):
+        out.append(("performance", f"pp{pp}", {"prompt_lengths": [pp], "batch_sizes": [], **common}))
+    for bs in _subset("performance.batch_sizes", perf.get("batch_sizes", []), BATCH_SIZES):
+        out.append(("performance", f"batch{bs}",
+                    {"prompt_lengths": [BATCH_PP], "batch_sizes": [bs], **common}))
+    return out
+
+
+def _intelligence_templates(intel: dict) -> list[tuple[str, str, dict]]:
+    """Expand [intelligence] into (suite, label, params) templates."""
+    suites = intel.get("suites") or {}
+    _check(isinstance(suites, dict), "intelligence.suites must be a table of suite = sample_size")
+    _subset("intelligence.suites", list(suites), SUITES)
+    think = intel.get("enable_thinking", False)
+    _check(isinstance(think, bool), "intelligence.enable_thinking must be true or false")
+    samp = intel.get("sampling_profile", "deterministic")
+    _check(samp in SAMPLING, f"intelligence.sampling_profile must be one of {sorted(SAMPLING)}")
+    bsz = intel.get("batch_size", 1)
+    _check(bsz in ACCURACY_BATCH, f"intelligence.batch_size must be one of {sorted(ACCURACY_BATCH)}")
+    out: list[tuple[str, str, dict]] = []
+    for suite, n in suites.items():
+        _check(isinstance(n, int) and n >= 0, f"intelligence.suites.{suite} must be an integer >= 0 (0 = whole dataset)")
+        out.append(("intelligence", suite, {"benchmarks": {suite: n}, "batch_size": bsz,
+                                             "enable_thinking": think, "sampling_profile": samp}))
+    return out
+
+
+def _context_templates(ctx: dict) -> list[tuple[str, str, dict]]:
+    """Expand [context] into (suite, label, params) templates."""
+    out: list[tuple[str, str, dict]] = []
+    for t in _subset("context.target_tokens", ctx.get("target_tokens", []), CONTEXT_TARGETS):
+        out.append(("context", f"ctx{t}", {"target_tokens": t}))
+    return out
+
+
 def load(path: Path) -> Plan:
     try:
         raw = tomllib.loads(path.read_text())
@@ -87,38 +132,9 @@ def build(raw: dict) -> Plan:
     perf, intel, ctx = raw.get("performance") or {}, raw.get("intelligence") or {}, raw.get("context") or {}
     templates: list[tuple[str, str, dict]] = []  # (suite, label, params)
 
-    if perf:
-        tg = perf.get("generation_length", 128)
-        _check(isinstance(tg, int) and tg > 0, "performance.generation_length must be a positive integer")
-        prof = perf.get("context_profile", "code_python")
-        _check(prof in CONTEXT_PROFILES, f"performance.context_profile must be one of {sorted(CONTEXT_PROFILES)}")
-        warm = perf.get("warmup_mode", "quick")
-        _check(warm in WARMUP_MODES, f"performance.warmup_mode must be one of {sorted(WARMUP_MODES)}")
-        common = {"generation_length": tg, "context_profile": prof, "warmup_mode": warm}
-        for pp in _subset("performance.prompt_lengths", perf.get("prompt_lengths", []), PROMPT_LENGTHS):
-            templates.append(("performance", f"pp{pp}", {"prompt_lengths": [pp], "batch_sizes": [], **common}))
-        for bs in _subset("performance.batch_sizes", perf.get("batch_sizes", []), BATCH_SIZES):
-            templates.append(("performance", f"batch{bs}",
-                              {"prompt_lengths": [BATCH_PP], "batch_sizes": [bs], **common}))
-
-    if intel:
-        suites = intel.get("suites") or {}
-        _check(isinstance(suites, dict), "intelligence.suites must be a table of suite = sample_size")
-        _subset("intelligence.suites", list(suites), SUITES)
-        think = intel.get("enable_thinking", False)
-        _check(isinstance(think, bool), "intelligence.enable_thinking must be true or false")
-        samp = intel.get("sampling_profile", "deterministic")
-        _check(samp in SAMPLING, f"intelligence.sampling_profile must be one of {sorted(SAMPLING)}")
-        bsz = intel.get("batch_size", 1)
-        _check(bsz in ACCURACY_BATCH, f"intelligence.batch_size must be one of {sorted(ACCURACY_BATCH)}")
-        for suite, n in suites.items():
-            _check(isinstance(n, int) and n >= 0, f"intelligence.suites.{suite} must be an integer >= 0 (0 = whole dataset)")
-            templates.append(("intelligence", suite, {"benchmarks": {suite: n}, "batch_size": bsz,
-                                                      "enable_thinking": think, "sampling_profile": samp}))
-
-    if ctx:
-        for t in _subset("context.target_tokens", ctx.get("target_tokens", []), CONTEXT_TARGETS):
-            templates.append(("context", f"ctx{t}", {"target_tokens": t}))
+    templates.extend(_performance_templates(perf))
+    templates.extend(_intelligence_templates(intel))
+    templates.extend(_context_templates(ctx))
 
     run = raw.get("run") or {}
     ma = run.get("max_attempts", 3)
