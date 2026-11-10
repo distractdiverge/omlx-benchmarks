@@ -154,37 +154,8 @@ class Runner:
         snap = self.settings.snapshot(step.model, f"{step.step_id} attempt {attempt}")
         snap_rel = str(snap.relative_to(self.cfg.paths.root))
         q.mark(step, "running", attempts=attempt, bench_id="", last_error="")
-        bench_id, events = "", []
-        outcome: tuple[str, str] = ("fail", "")
         try:
-            try:
-                self.settings.apply_model(step.model, step.settings_dict)
-                try:
-                    bench_id = self._start(step)
-                except ApiError as e:
-                    if e.status == 409:
-                        raise StopRun("__busy__") from None
-                    if e.status == 0:
-                        raise StopRun(e.detail) from None
-                    raise StepFailed(f"oMLX rejected the request: HTTP {e.status} {e.detail}") from None
-                q.mark(step, "running", bench_id=bench_id)
-                self.follow(step, bench_id, events)
-                if not any(ev.get("type") == "result" for ev in events):
-                    raise StepFailed("benchmark finished without a result")
-                outcome = ("pass", "")
-            except SettingsError as e:
-                outcome = ("fail", f"settings: {e}")
-            except StepFailed as e:
-                outcome = ("fail", str(e))
-            except KeyboardInterrupt:
-                if bench_id:
-                    self.out("  Ctrl-C: cancelling on the server…")
-                    self._cancel(step, bench_id)
-                outcome = ("interrupted", "cancelled by user")
-            except StopRun as e:
-                outcome = ("busy" if str(e) == "__busy__" else "stopped", str(e))
-            except ApiError as e:
-                outcome = ("stopped", e.detail) if e.status == 0 else ("fail", f"oMLX error: {e}")
+            status, err, bench_id, events = self._attempt_step(step)
         finally:
             try:
                 restored = self.settings.restore(snap)
@@ -195,7 +166,6 @@ class Runner:
                 raise StopRun(f"settings restore failed; stopping so nothing stacks on an unknown state: {e}"
                               f"\n  snapshot: {snap_rel}  (fix, then: omlx-bench settings restore)") from None
 
-        status, err = outcome
         if status == "pass":
             final = self._final(step, bench_id)
             ids = self.ledger.record(step, attempt, bench_id, events, final, step.settings_dict, snap_rel, started)
@@ -214,6 +184,39 @@ class Runner:
         if status == "interrupted":
             raise KeyboardInterrupt
         raise StopRun(err)
+
+    def _attempt_step(self, step: Step) -> tuple[str, str, str, list[dict]]:
+        """Run one attempt: apply settings, start, stream, return (status, err, bench_id, events)."""
+        bench_id, events = "", []
+        try:
+            self.settings.apply_model(step.model, step.settings_dict)
+            try:
+                bench_id = self._start(step)
+            except ApiError as e:
+                if e.status == 409:
+                    raise StopRun("__busy__") from None
+                if e.status == 0:
+                    raise StopRun(e.detail) from None
+                raise StepFailed(f"oMLX rejected the request: HTTP {e.status} {e.detail}") from None
+            q = self.queue
+            q.mark(step, "running", bench_id=bench_id)
+            self.follow(step, bench_id, events)
+            if not any(ev.get("type") == "result" for ev in events):
+                raise StepFailed("benchmark finished without a result")
+            return ("pass", "", bench_id, events)
+        except SettingsError as e:
+            return ("fail", f"settings: {e}", bench_id, events)
+        except StepFailed as e:
+            return ("fail", str(e), bench_id, events)
+        except KeyboardInterrupt:
+            if bench_id:
+                self.out("  Ctrl-C: cancelling on the server…")
+                self._cancel(step, bench_id)
+            return ("interrupted", "cancelled by user", bench_id, events)
+        except StopRun as e:
+            return ("busy" if str(e) == "__busy__" else "stopped", str(e), bench_id, events)
+        except ApiError as e:
+            return (("stopped", e.detail) if e.status == 0 else ("fail", f"oMLX error: {e}")) + (bench_id, events)
 
     # -- whole run --------------------------------------------------------------
     def recover(self) -> None:
