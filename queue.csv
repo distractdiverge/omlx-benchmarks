@@ -1,1 +1,1 @@
-step_id,model,suite,label,variant,params,status,attempts,last_error,bench_id,result_ids,updated_at
+step_id,model,suite,label,variant,settings,params,status,attempts,last_error,bench_id,result_ids,updated_at

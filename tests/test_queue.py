@@ -36,3 +36,12 @@ def test_retry_rules(tmp_path):
 def test_no_temp_file_left_behind(tmp_path):
     q = Queue(tmp_path / "q.csv"); q.add("m", "x", "l", "v", {}); q.save()
     assert sorted(p.name for p in tmp_path.iterdir()) == ["q.csv"]
+
+
+def test_variant_settings_are_part_of_identity(tmp_path):
+    q = Queue(tmp_path / "q.csv")
+    assert q.add("m", "context", "c", "tq", {"t": 1}, {"turboquant_kv_bits": 4})
+    assert q.add("m", "context", "c", "tq", {"t": 1}, {"turboquant_kv_bits": 3})
+    assert q.add("m", "context", "c", "tq", {"t": 1}, {"turboquant_kv_bits": 4}) is None
+    q.save()
+    assert Queue(tmp_path / "q.csv").steps[0].settings_dict == {"turboquant_kv_bits": 4}

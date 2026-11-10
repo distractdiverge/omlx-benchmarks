@@ -9,7 +9,7 @@ wants her benchmark data local and owned, feeding her dashboard. Runs take hours
 the process can die (sleep, crash, Ctrl-C), so state must survive at every point.
 
 ## Decision
-- `queue.csv`: one row per step. Columns: `step_id, model, suite, label, variant,
+- `queue.csv`: one row per step. Columns: `step_id, model, suite, label, variant, settings,
   params, status, attempts, last_error, bench_id, result_ids, updated_at`.
   `status` ∈ pending · running · pass · fail. `params` is the exact request body
   (minus model_id) as compact JSON, so a step is reproducible from its row alone.

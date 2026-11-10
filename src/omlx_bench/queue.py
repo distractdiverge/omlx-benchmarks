@@ -1,6 +1,8 @@
 """queue.csv: every planned step and where it stands (ADR 0002, 0005).
 
-A step's identity is (model, suite, variant, params). Re-planning only appends
+A step's identity is (model, suite, variant, variant settings, params). The
+variant's settings are frozen into the row, so editing a variant in plan.toml
+later creates new steps instead of silently changing old ones. Re-planning only appends
 steps whose identity is new; history is never rewritten.
 """
 from __future__ import annotations
@@ -12,7 +14,7 @@ from pathlib import Path
 
 from .files import read_csv, write_csv
 
-COLUMNS = ["step_id", "model", "suite", "label", "variant", "params", "status",
+COLUMNS = ["step_id", "model", "suite", "label", "variant", "settings", "params", "status",
            "attempts", "last_error", "bench_id", "result_ids", "updated_at"]
 STATUSES = {"pending", "running", "pass", "fail"}
 SUITE_ORDER = {"performance": 0, "intelligence": 1, "context": 2}
@@ -33,6 +35,7 @@ class Step:
     suite: str
     label: str
     variant: str
+    settings: str        # canonical JSON of the variant's per-model settings ("{}" = as-is)
     params: str          # canonical JSON request body without model_id
     status: str = "pending"
     attempts: int = 0
@@ -43,7 +46,11 @@ class Step:
 
     @property
     def key(self) -> tuple:
-        return (self.model, self.suite, self.variant, self.params)
+        return (self.model, self.suite, self.variant, self.settings, self.params)
+
+    @property
+    def settings_dict(self) -> dict:
+        return json.loads(self.settings or "{}")
 
     @property
     def body(self) -> dict:
@@ -76,12 +83,13 @@ class Queue:
         n = max((int(s.step_id[1:]) for s in self.steps if s.step_id[1:].isdigit()), default=0)
         return f"S{n + 1:04d}"
 
-    def add(self, model: str, suite: str, label: str, variant: str, params: dict) -> Step | None:
+    def add(self, model: str, suite: str, label: str, variant: str, params: dict,
+            settings: dict | None = None) -> Step | None:
         """Append a step unless an identical one exists. Returns the new step or None."""
-        p = canon(params)
-        if any(s.key == (model, suite, variant, p) for s in self.steps):
+        p, st = canon(params), canon(settings or {})
+        if any(s.key == (model, suite, variant, st, p) for s in self.steps):
             return None
-        s = Step(self._next_id(), model, suite, label, variant, p)
+        s = Step(self._next_id(), model, suite, label, variant, st, p)
         self.steps.append(s)
         return s
 
