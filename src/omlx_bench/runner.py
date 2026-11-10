@@ -60,40 +60,37 @@ class Runner:
         self.cfg_max_attempts = 3
 
     # -- family dispatch ----------------------------------------------------
+    _START = {"performance": "perf_start", "intelligence": "accuracy_add", "context": "context_start"}
+    _STREAM = {"performance": "perf_stream", "intelligence": "accuracy_stream", "context": "context_stream"}
+    _CANCEL = {"performance": "perf_cancel", "intelligence": "accuracy_cancel", "context": "context_cancel"}
+    _FINAL = {"performance": "perf_results", "context": "context_results"}
+
+    def _client_call(self, step: Step, table: dict[str, str], *args, **kwargs):
+        name = table.get(step.suite)
+        if name is None:
+            raise StepFailed(f"unknown suite {step.suite!r}")
+        return getattr(self.client, name)(*args, **kwargs)
+
     def _start(self, step: Step) -> str:
-        body = step.body
-        if step.suite == "performance":
-            return self.client.perf_start(body)
-        if step.suite == "intelligence":
-            return self.client.accuracy_add(body)
-        if step.suite == "context":
-            return self.client.context_start(body)
-        raise StepFailed(f"unknown suite {step.suite!r}")
+        return self._client_call(step, self._START, step.body)
 
     def _stream(self, step: Step, bench_id: str):
-        return {"performance": self.client.perf_stream, "intelligence": self.client.accuracy_stream,
-                "context": self.client.context_stream}[step.suite](bench_id)
+        return self._client_call(step, self._STREAM, bench_id)
 
     def _cancel(self, step: Step, bench_id: str) -> None:
         try:
-            if step.suite == "performance":
-                self.client.perf_cancel(bench_id)
-            elif step.suite == "intelligence":
-                self.client.accuracy_cancel()
-            else:
-                self.client.context_cancel(bench_id)
+            self._client_call(step, self._CANCEL, bench_id)
         except ApiError as e:
             self.out(f"  (cancel: {e.detail})")
 
     def _final(self, step: Step, bench_id: str):
+        name = self._FINAL.get(step.suite)
+        if name is None:
+            return None  # accuracy has no per-run results route; events carry everything
         try:
-            if step.suite == "performance":
-                return self.client.perf_results(bench_id)
-            if step.suite == "context":
-                return self.client.context_results(bench_id)
+            return getattr(self.client, name)(bench_id)
         except ApiError:
             return None
-        return None  # accuracy has no per-run results route; events carry everything
 
     # -- waiting ------------------------------------------------------------
     def wait_idle(self) -> None:
