@@ -11,3 +11,4 @@ Format (Michael Nygard): **Status · Context · Decision · Consequences.**
 | [0002](0002-one-test-per-step.md) | One test per step, model by model | Accepted |
 | [0003](0003-always-restore-settings.md) | Benchmarks never leave a settings change behind | Accepted |
 | [0004](0004-stdlib-only-runtime.md) | Standard library only at runtime; uv for Python and tooling | Accepted |
+| [0005](0005-plain-file-state.md) | State in plain files: CSV status/results, JSON detail | Accepted |
