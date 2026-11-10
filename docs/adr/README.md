@@ -12,3 +12,4 @@ Format (Michael Nygard): **Status · Context · Decision · Consequences.**
 | [0003](0003-always-restore-settings.md) | Benchmarks never leave a settings change behind | Accepted |
 | [0004](0004-stdlib-only-runtime.md) | Standard library only at runtime; uv for Python and tooling | Accepted |
 | [0005](0005-plain-file-state.md) | State in plain files: CSV status/results, JSON detail | Accepted |
+| [0006](0006-runner-failure-semantics.md) | Runner failure semantics: what costs an attempt | Accepted |
