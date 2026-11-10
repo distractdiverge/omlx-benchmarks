@@ -75,10 +75,7 @@ class Client:
 
     def stream(self, path: str, terminal: set[str]) -> Iterator[dict]:
         """Yield SSE `data:` events as dicts until a terminal event type."""
-        try:
-            resp = self._open("GET", path, timeout=STREAM_READ_TIMEOUT)
-        except ApiError:
-            raise
+        resp = self._open("GET", path, timeout=STREAM_READ_TIMEOUT)
         try:
             with resp:
                 for raw in resp:
