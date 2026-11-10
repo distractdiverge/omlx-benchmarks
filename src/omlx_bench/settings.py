@@ -136,13 +136,23 @@ class Settings:
         self.client.put_model_settings(model, changes)
         self.log("set-model", model, changes)
 
-    def apply_model(self, model: str, changes: dict) -> None:
+    @staticmethod
+    def check_model(changes: dict) -> None:
         bad = FORBIDDEN_MODEL_KEYS & set(changes)
         if bad:
             raise SettingsError(f"refusing to change {sorted(bad)}: the tool never touches them")
         bad = NOT_UPDATABLE & set(changes)
         if bad:
             raise SettingsError(f"{sorted(bad)} can't be set through oMLX's settings API")
+
+    @staticmethod
+    def check_global(changes: dict) -> None:
+        bad = FORBIDDEN_GLOBAL_KEYS & set(changes)
+        if bad:
+            raise SettingsError(f"refusing to change {sorted(bad)}: binding/auth/model-folder settings are off limits")
+
+    def apply_model(self, model: str, changes: dict) -> None:
+        self.check_model(changes)
         if changes:
             try:
                 self._put_model(model, changes)
@@ -150,9 +160,7 @@ class Settings:
                 raise SettingsError(f"oMLX rejected settings {changes} for {model}: {e.detail}") from None
 
     def apply_global(self, changes: dict) -> None:
-        bad = FORBIDDEN_GLOBAL_KEYS & set(changes)
-        if bad:
-            raise SettingsError(f"refusing to change {sorted(bad)}: binding/auth/model-folder settings are off limits")
+        self.check_global(changes)
         if changes:
             self.client.post_global_settings(changes)
             self.log("set-global", "global", changes)
