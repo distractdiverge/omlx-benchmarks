@@ -96,9 +96,9 @@ class Queue:
     def ordered(self, model_order: list[str]) -> list[Step]:
         """Model by model (plan order, unknown models last), then suite, then file order."""
         rank = {m: i for i, m in enumerate(model_order)}
-        idx = {id(s): i for i, s in enumerate(self.steps)}
+        # sorted is stable, so equal keys keep file order — no index tiebreaker needed.
         return sorted(self.steps, key=lambda s: (rank.get(s.model, len(rank)), s.model,
-                                                 SUITE_ORDER.get(s.suite, 9), idx[id(s)]))
+                                                 SUITE_ORDER.get(s.suite, 9)))
 
     def mark(self, step: Step, status: str, **fields) -> None:
         assert status in STATUSES
