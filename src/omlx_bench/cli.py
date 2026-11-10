@@ -56,7 +56,11 @@ def cmd_plan(a) -> int:
     except ApiError as e:
         print(f"(couldn't check model ids against oMLX: {e.detail})")
     q = Queue(cfg.paths.queue)
-    added = [s for p in plan.steps if (s := q.add(p.model, p.suite, p.label, p.variant, p.params, p.settings))]
+    added = []
+    for p in plan.steps:
+        s = q.add(p.model, p.suite, p.label, p.variant, p.params, p.settings)
+        if s:
+            added.append(s)
     q.save()
     by = Counter((s.model, s.suite) for s in added)
     print(f"Added {len(added)} step(s); {len(q.steps) - len(added)} already planned.")
@@ -135,13 +139,22 @@ def cmd_settings(a) -> int:
     if a.action in ("set", "global"):
         changes = parse_assignments(a.assignments)
         model = a.model if a.action == "set" else None
-        st.check_model(changes) if model else st.check_global(changes)  # refuse before touching anything
+        # refuse before touching anything
+        if model:
+            st.check_model(changes)
+        else:
+            st.check_global(changes)
         snap = st.snapshot(model, "manual change via `settings " + a.action + "`",
                            [] if model else list(changes))
         # Deliberate changes are kept; the snapshot is a backup, not a pending restore.
-        data = json.loads(snap.read_text()); data["restored"] = True; data["manual_backup"] = True
+        data = json.loads(snap.read_text())
+        data["restored"] = True
+        data["manual_backup"] = True
         snap.write_text(json.dumps(data, indent=2))
-        (st.apply_model(model, changes) if model else st.apply_global(changes))
+        if model:
+            st.apply_model(model, changes)
+        else:
+            st.apply_global(changes)
         print(f"Changed {sorted(changes)}. Undo with: omlx-bench settings restore {snap.name}")
         return 0
     if a.action == "restore":
@@ -158,7 +171,8 @@ def cmd_settings(a) -> int:
                 return 0
         for p in paths:
             done = st.restore(p)
-            print(f"{p.name}: {'restored ' + json.dumps(done) if done else 'already matched'}")
+            msg = "restored " + json.dumps(done) if done else "already matched"
+            print(f"{p.name}: {msg}")
         return 0
     return 1
 
