@@ -1,6 +1,6 @@
 # omlx-bench — plan (v2)
 
-Status: **scaffolding written (v2 + settings control); logic waiting for Astrid's approval.**
+Status: **approved 2026-11-09; in development.**
 API facts verified against oMLX source, commit 2165e75 (Nov 5 2026).
 
 ## Goal
@@ -63,17 +63,18 @@ How the tool will use it:
 - **Every result records the exact settings it ran under** (full settings in the details JSON; variant name + changed keys in index.csv). Results stay comparable months later.
 - **Standalone commands too:** `settings show <model>`, `settings set <model> key=value …`, `settings global …`, `settings restore`. I can use these directly when you ask, e.g. "turn on Memory Guard" before context runs.
 - **Guardrails:** the tool refuses to touch server-binding and access settings (host, port, auth/API keys, model directories). Those need a restart or could lock us out. Everything it changes is logged in `settings/changes.log`.
-- This resolves the context-bench side effect (old decision 3): by default the context step's `max_context_window` write is restored like any other change. Set `keep_context_result = true` if you want the discovered value kept.
+- The context benchmark's `max_context_window` write is restored like any other change (decision 3).
 
 ## omlx.ai sharing
 Performance and intelligence results are automatically uploaded to the omlx.ai community board after each step, as when you run them from the dashboard. Context results are not. Upload URLs and IDs get saved in the ledger. An upload failure doesn't fail the step.
 
-## Decisions needed
-1. **Main API key** in `.env`. Sub-keys get a 401 on every admin route.
-2. **Auto-upload to omlx.ai** for perf and intelligence: OK?
-3. **Context side effect:** now handled by snapshot/restore (see Settings control). Default: restore. OK?
-4. **Intelligence defaults:** `mmlu`, `gsm8k`, `humaneval` at 200 samples each, thinking off. Full datasets can take hours per suite on the M3 Pro.
-5. **Step order:** model-by-model (finish A, then B) is what I've assumed. Or do you want suite-by-suite across all models (all perf first)?
+## Decisions (settled 2026-11-09)
+1. Main API key is in `.env` (git-ignored, never staged off the Mac).
+2. Auto-upload to omlx.ai for perf + intelligence: **OK for now**.
+3. **No benchmark may leave a system change behind.** Every step snapshots settings first and restores them after, whether it passes, fails or is cancelled. This includes the context benchmark's `max_context_window` write. There is no `keep_context_result` switch; the discovered value lives in the ledger, not in oMLX.
+4. Intelligence suites follow the benchmarking notes and the dashboard: **MMLU-Pro, ARC-Challenge, HumanEval, MBPP, TruthfulQA, BBQ**. No GSM8K. Sample sizes match the dashboard's "full" sizes (MMLU-Pro 1000, ARC-C 300, HumanEval 164, MBPP 500, TruthfulQA 817, BBQ 1000), because it drops runs under 150 questions. LiveCodeBench (1,054 questions, 8+ hours) is listed but commented out.
+5. **Model by model:** finish every step for one model before starting the next.
+6. Each intelligence step also writes `results/exports/<model_id>_<benchmark>.json` in exactly the format of oMLX's own Download JSON, so the dashboard skill ingests it unchanged. The run date comes from `results/index.csv`.
 
 ## Build order (after approval)
 1. `client.py` + `ledger.py` + `queue.py`, tested here against a fake oMLX server that replays the real event sequences, including failures, 409s, cancel and resume.

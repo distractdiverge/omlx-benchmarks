@@ -20,13 +20,19 @@ generation_length = 128
 context_profile = "code_python"
 
 [intelligence]         # one step = one suite
-sample_size = 200      # 0 = full dataset
-suites = ["mmlu", "gsm8k", "humaneval"]
 enable_thinking = false
-sampling_profile = "deterministic"
+sampling_profile = "deterministic"   # temperature 0, reproducible
+# suite = sample size. Sizes match the dashboard's "full" runs (it drops runs under 150 questions).
+[intelligence.suites]
+mmlu_pro = 1000
+arc_challenge = 300
+humaneval = 164
+mbpp = 500
+truthfulqa = 817
+bbq = 1000
+# livecodebench = 1054   # 8+ hours on the M3 Pro
 
 [context]              # one step = one target size
-keep_context_result = false  # true = keep the max_context_window it discovers
 target_tokens = [32768, 131072]
 
 [run]
